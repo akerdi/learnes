@@ -1,0 +1,17 @@
+test.iced
+*.js
+!lib/ftp/**/*
+!gulpfile.js
+!lib/soap/*.js
+config.iced
+config.ts
+/node_modules/
+/dist*
+/public/
+/upload/
+.DS_Store
+/logs/
+apidoc/
+.nyc_output/
+.vscode/launch.json
+!.vscode/

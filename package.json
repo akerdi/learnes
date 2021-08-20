@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "dev": "nodemon --watch '**/*.ts' --ignore '**/*.test.*' --exec 'TS_NODE_FILES=true TS_NODE_TRANSPILE_ONLY=true ts-node --files -r tsconfig-paths/register' app.ts"
+  },
+  "dependencies": {
+    "elastic-apm-node": "^3.20.0",
+    "elasticsearch": "^16.7.2"
+  },
+  "devDependencies": {
+    "@types/elasticsearch": "5.0.36",
+    "nodemon": "^2.0.12",
+    "ts-node": "8.6.2",
+    "tsconfig-paths": "^3.10.1",
+    "typescript": "^4.3.5"
+  }
+}
