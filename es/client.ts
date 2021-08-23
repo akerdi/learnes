@@ -26,7 +26,7 @@ export default class ESClient {
     return this.getClient().mget(params)
   }
 
-  static create(params) {
+  static create(params:{index:string, type:string, id?:string, body:any}) {
     return this.getClient().create(params)
   }
   static bulk(params:any) {
