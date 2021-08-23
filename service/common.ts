@@ -29,9 +29,14 @@ interface IBulkBody {
 interface IIndex {
   index:string, type:string
 }
+interface IQuery {
+  term?: any
+}
 
 export default new class CommonService {
   async testes() {
+    const index = "accounts"
+    const type = "persons"
     // await this.testSearch()
     // await this.testIndices()
     // await this.testCreateIndexAccountsTypePerson("accounts", "persons", {user: "张三",title: "工程师",desc: "数据库管理"})
@@ -39,6 +44,7 @@ export default new class CommonService {
     // await this.bulkCreateElement({index: "accounts", type: "persons", id: 3}, [{user: "aker2", title: "hah"}])
     // await this.bulkUpdateElement({index: "accounts", type: "persons"}, [{user: "aker3", id: 3}])
     // await this.bulkDeleteElement("accounts", "persons", [2])
+    // await this.deleteByQuery({index, type}, { term: { title: "2222" } })
   }
   ////////////////////////////////////////////
   // -
@@ -110,5 +116,19 @@ export default new class CommonService {
     const [err, result] = await callAsync(ESClient.bulk({body}))
     if (err) console.error("bulkDeleteElement err: ", err)
     console.log("bulkDeleteElement result: ", JSON.stringify(result))
+  }
+  // 根据查询删除
+  // await this.deleteByQuery({index, type}, { term: { title: "2222" } })
+  async deleteByQuery(index:IIndex, query:IQuery) {
+    const params = {
+      index: index.index,
+      type: index.type,
+      body: {
+        query
+      }
+    }
+    const [err, result] = await callAsync(ESClient.deleteByQuery(params))
+    if (err) return console.error("deleteByQuery err: ", err)
+    console.log("deleteByQuery result: ", JSON.stringify(result))
   }
 }
