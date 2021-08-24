@@ -15,3 +15,5 @@ apidoc/
 .nyc_output/
 .vscode/launch.json
 !.vscode/
+parser/schema
+parser/test

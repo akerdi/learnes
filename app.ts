@@ -19,11 +19,14 @@ async function connectES() {
 
 async function main() {
   await connectES()
-  logInfo("================")
+  logInfo("server start...")
   await CommonService.testes()
 }
 
 main()
   .catch(e => {
     logError(e.message)
+    if (e.code === "ERR_ASSERTION") {
+      process.exit(1)
+    }
   })
