@@ -33,6 +33,9 @@ export interface ISearch {
     fuzzy?: { // 检索用于此项的近似检索，例如applx 可以检索出包含apple 的文档
       [key:string]: any
     }
+    aggs?: { // 聚合
+      [key:string]: any
+    }
   }
   from?: number // offset
   size?: number // 搜索大小
@@ -109,11 +112,8 @@ export default class ESClient {
   static count(params:any) {
     return this.getClient().count(params)
   }
-  static async scrollQuery(dsl:any) {
-
-  }
-  static async scrollQueryNext(sq:{scrollId:string, scoll:string}) {
-
+  static async scrollQueryNext(sq:{scrollId:string, scroll:string}) {
+    return this.getClient().scroll(sq)
   }
   static async clearScroll(scrollId:string) {
 

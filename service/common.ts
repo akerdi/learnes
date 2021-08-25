@@ -62,24 +62,31 @@ export default new class CommonService {
 
     // const items = await this.readBCPDataAndSaveES()
     // await this.bulkCreateElement({index}, items)
-    // await this.search({index}, {
-    //   query: {
-    //     match: {
-    //       CONTENT: "你"
-    //     }
-    //   },
-    //   size: 10,
-    //   from: 0,
-    //   _source: ["CONTENT", "FRIEND_ID"],
-    //   highlight: {
-    //     pre_tags: ["<strong>"],
-    //     post_tags: ["</strong>"],
-    //     fields: {
-    //       CONTENT: {
-    //       }
-    //     }
-    //   }
-    // })
+    const result = await this.search({index}, {
+      query: {
+        match: {
+          CONTENT: "你"
+        },
+      },
+      size: 2,
+      from: 0,
+      _source: ["CONTENT", "FRIEND_ID"],
+      highlight: {
+        pre_tags: ["<strong>"],
+        post_tags: ["</strong>"],
+        fields: {
+          CONTENT: {
+          }
+        }
+      }
+    }, "10m")
+
+    while (true) {
+      await Utils.sleep(3*1000)
+      const result1:any = await this.searchByQueryNext({scrollId: result._scroll_id, scroll: "5m"})
+      if (!result1.hits.hits?.length) break
+    }
+
     // await this.search({index}, {
     //   query: {
     //     multi_match: {
@@ -123,7 +130,7 @@ export default new class CommonService {
           }
         }
       }
-    })
+    }, "10m")
 
 
     ///////////////////////
@@ -144,15 +151,24 @@ export default new class CommonService {
   ////////////////////////////////////////////
   // -
   // search
-  async search(index:IIndex, searchBody:ISearch) {
+  // 是否带有scroll
+  async search(index:IIndex, searchBody:ISearch, scroll?:string):Promise<any> {
     const params:any = {
       index: index.index,
       body: searchBody
     }
+    if (scroll) params.scroll = scroll
     if (index.type) params.type = index.type
     const [err, result] = await callAsync(ESClient.dslSearch(params))
     if (err) return console.error("search err: ", err)
     console.log("search result: ", JSON.stringify(result))
+    return result
+  }
+  async searchByQueryNext(sq:{scrollId:string, scroll:string}) {
+    const [err, result] = await callAsync(ESClient.scrollQueryNext(sq))
+    if (err) return console.error("search err: ", err)
+    console.log("search result: ", JSON.stringify(result))
+    return result
   }
   async simpleSearch(index:IIndex, q?:string) {
     const params:any = { index: index.index }
