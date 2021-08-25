@@ -49,10 +49,26 @@ interface IQuery {
   }
 }
 
-
-
 export default new class CommonService {
   async testes() {
+    // await this.practiceAggregates1()
+    // await this.practiceAggregates2()
+    // await this.practiceAggregates3()
+    // await this.practiceAggregatesTerms()
+    // await this.practiceAggregatesRange()
+    // await this.addDatePracticeDATA()
+    // await this.practiceAggregatesDateRangeOrder()
+    // await this.practiceAggregatesHistogram()
+    // await this.practiceAggregatesDateHistogram()
+    // await this.practiceAggregatesParentDerivative()
+    // await this.practiceAggregatesParentMovingAVG()
+    // await this.practiceAggregatesParentCumulativeSUM()
+    // await this.practiceAggregatesParentBucketSort()
+    // await this.practiceAggregatesSiblingAVGBUCKET()
+    // await this.practiceAggregatesSiblingMAXBUCKET()
+    await this.practiceAggregatesQueryWithAggregation()
+    return
+    // 创建搜索
     const index = "accountsik"
     const type = "persons"
     // await this.testSearch()
@@ -63,23 +79,13 @@ export default new class CommonService {
     // const items = await this.readBCPDataAndSaveES()
     // await this.bulkCreateElement({index}, items)
     const result = await this.search({index}, {
-      query: {
-        match: {
-          CONTENT: "你"
-        },
-      },
+      scroll: "10m",
+      query: { match: { CONTENT: "你" } },
       size: 2,
       from: 0,
       _source: ["CONTENT", "FRIEND_ID"],
-      highlight: {
-        pre_tags: ["<strong>"],
-        post_tags: ["</strong>"],
-        fields: {
-          CONTENT: {
-          }
-        }
-      }
-    }, "10m")
+      highlight: { pre_tags: ["<strong>"], post_tags: ["</strong>"], fields: { CONTENT: {} } }
+    })
 
     while (true) {
       await Utils.sleep(3*1000)
@@ -87,50 +93,24 @@ export default new class CommonService {
       if (!result1.hits.hits?.length) break
     }
 
-    // await this.search({index}, {
-    //   query: {
-    //     multi_match: {
-    //       query: "你",
-    //       fields: ["*"]
-    //     },
-    //   },
-    //   _source: ["CONTENT", "FRIEND_ID"]
-    // })
-    // await this.search({index}, {
-    //   query: {
-    //     term: {
-    //       CONTENT: {
-    //         value: "车"
-    //       }
-    //     }
-    //   },
-    //   _source: ["CONTENT"],
-    //   highlight: {
-    //     fields: {
-    //       CONTENT: {}
-    //     }
-    //   }
-    // })
     await this.search({index}, {
+      query: { multi_match: { query: "你", fields: ["*"] }, },
+      _source: ["CONTENT", "FRIEND_ID"]
+    })
+    await this.search({index}, {
+      query: { term: { CONTENT: { value: "车" } } },
+      _source: ["CONTENT"],
+      highlight: { fields: { CONTENT: {} } }
+    })
+    await this.search({index}, {
+      scroll: "10m",
       query: {
         bool: {
-          must: {
-            multi_match: {
-              query: "草 金子",
-              fields: ["CONTENT", "FRIEND_NICKNAME"]
-            }
-          },
-          filter: {
-            range: {
-              MAIL_SEND_TIME: {
-                gte: 1600340189,
-                lte: 1600410382
-              }
-            }
-          }
+          must: { multi_match: { query: "草 金子", fields: ["CONTENT", "FRIEND_NICKNAME"] } },
+          filter: { range: { MAIL_SEND_TIME: { gte: 1600340189, lte: 1600410382 } } }
         }
       }
-    }, "10m")
+    })
 
 
     ///////////////////////
@@ -151,19 +131,21 @@ export default new class CommonService {
   ////////////////////////////////////////////
   // -
   // search
-  // 是否带有scroll
-  async search(index:IIndex, searchBody:ISearch, scroll?:string):Promise<any> {
+  // 支持match、multi_match、scroll、aggs、等等
+  async search(index:IIndex, searchBody:ISearch):Promise<any> {
     const params:any = {
       index: index.index,
       body: searchBody
     }
-    if (scroll) params.scroll = scroll
+    if (searchBody.scroll) params.scroll = searchBody.scroll
     if (index.type) params.type = index.type
     const [err, result] = await callAsync(ESClient.dslSearch(params))
     if (err) return console.error("search err: ", err)
     console.log("search result: ", JSON.stringify(result))
     return result
   }
+  // 使用scrollId进行滚动搜索
+  // await this.searchByQueryNext({scrollId: result._scroll_id, scroll: "5m"})
   async searchByQueryNext(sq:{scrollId:string, scroll:string}) {
     const [err, result] = await callAsync(ESClient.scrollQueryNext(sq))
     if (err) return console.error("search err: ", err)
@@ -332,5 +314,356 @@ export default new class CommonService {
     const [err, result] = await callAsync(ESClient.count(params))
     if (err) return console.error("count err: ", err)
     console.log("count result: ", JSON.stringify(result))
+  }
+
+  // aggregation
+  static aggressCommonIndex:IIndex = {index: "math", type: "final"}
+  static aggressRangeIndex:IIndex = {index: "order", type: "day"}
+  async practiceAggregates1() {
+    const datas = [
+    {"sudent":"Amy", "score":100},
+    {"sudent":"Andy", "score":99},
+    {"sudent":"Benson", "score":95},
+    {"sudent":"Bob", "score":88},
+    {"sudent":"Cathy", "score":81},
+    {"sudent":"Daniel", "score":79},
+    {"sudent":"Edward", "score":77},
+    {"sudent":"Frank", "score":70},
+    {"sudent":"Gigi", "score":66},
+    {"sudent":"Henry", "score":60},
+    {"sudent":"Ian", "score":58},
+    {"sudent":"Jerry", "score":58},
+    {"sudent":"John", "score":33},
+    {"sudent":"Jordon", "score":38}]
+
+    await this.bulkCreateElement(CommonService.aggressCommonIndex, datas)
+  }
+  async practiceAggregates2() {
+    await this.search(CommonService.aggressCommonIndex, {
+      size: 0,
+      aggs: {
+        min_score: {
+          min: {
+            field: "score"
+          }
+        },
+        max_score: {
+          max: {
+            field: "score"
+          }
+        },
+        avg_score: {
+          avg: {
+            field: "score"
+          }
+        },
+        sum_score: {
+          sum: {
+            field: "score"
+          }
+        },
+        cardinality_score: {
+          cardinality: {
+            field: "score"
+          }
+        },
+        value_count_score: {
+          value_count: {
+            field: "score"
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregates3() {
+    await this.search(CommonService.aggressCommonIndex, {
+      size: 0,
+      aggs: {
+        stats_score: {
+          stats: {
+            field: "score"
+          }
+        },
+        extended_stats_score: {
+          extended_stats: {
+            field: "score"
+          }
+        },
+        percentiles_score: {
+          percentiles: {
+            field: "score"
+          }
+        },
+        percentile_ranks_score: {
+          percentile_ranks: {
+            field: "score",
+            values: [50, 78]
+          }
+        },
+        top_hits: {
+          top_hits: {
+            size: 2
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesTerms() {
+    await this.search(CommonService.aggressCommonIndex, {
+      aggs: {
+        terms_score: {
+          terms: {
+            field: "score",
+            size: 15
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesRange() {
+    await this.search(CommonService.aggressCommonIndex, {
+      aggs: {
+        range_score: {
+          range: {
+            field: "score",
+            ranges: [{to: 60}, {from: 60, to:90}, {from:90}]
+          }
+        }
+      }
+    })
+  }
+  async addDatePracticeDATA() {
+    const datas = [
+      {"price":100, "date":"2020-07-13"},
+      {"price":530, "date":"2020-07-14"},
+      {"price":100, "date":"2020-07-15"},
+      {"price":385, "date":"2020-07-16"},
+      {"price":300, "date":"2020-07-17"},
+      {"price":790, "date":"2020-07-18"},
+      {"price":560, "date":"2020-07-19"},
+      {"price":530, "date":"2020-07-20"},
+      {"price":385, "date":"2020-07-21"},
+      {"price":150, "date":"2020-07-22"},
+      {"price":115, "date":"2020-07-23"},
+      {"price":100, "date":"2020-07-24"},
+      {"price":530, "date":"2020-07-25"},
+      {"price":750, "date":"2020-07-26"},
+      {"price":258, "date":"2020-07-27"},
+      {"price":100, "date":"2020-07-28"},
+      {"price":100, "date":"2020-07-29"}
+    ]
+    await this.bulkCreateElement(CommonService.aggressRangeIndex, datas)
+  }
+  async practiceAggregatesDateRangeOrder() {
+    await this.search(CommonService.aggressRangeIndex, {
+      aggs: {
+        date_range_order: {
+          date_range: {
+            field: "date",
+            ranges: [
+              {to: "2020-07-23"},
+              {from: "2020-07-23"}
+            ]
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesHistogram() {
+    await this.search(CommonService.aggressRangeIndex, {
+      aggs: {
+        histogram: {
+          histogram: {
+            field: "price",
+            interval: 100,
+            min_doc_count: 1
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesDateHistogram() {
+    await this.search(CommonService.aggressRangeIndex, {
+      aggs: {
+        date_histogram: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesParentDerivative() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size: 0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            },
+            derivative_sales: {
+              derivative: {
+                buckets_path: "sales"
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesParentMovingAVG() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size: 0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "5d"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            },
+            moving_avg_sales: {
+              moving_avg: {
+                buckets_path: "sales"
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesParentCumulativeSUM() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size: 0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            },
+            cumulative_sum_sales: {
+              cumulative_sum: {
+                buckets_path: "sales"
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesParentBucketSort() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size: 0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            },
+            buckkkk: {
+              bucket_sort: {
+                sort: [{sales: { order: "desc" } }],
+                size: 5
+              }
+            }
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesSiblingAVGBUCKET() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size:0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            }
+          }
+        },
+        avg_weekly_sales: {
+          avg_bucket: {
+            buckets_path: "sales_per_week>sales"
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesSiblingMAXBUCKET() {
+    await this.search(CommonService.aggressRangeIndex, {
+      size: 0,
+      aggs: {
+        sales_per_week: {
+          date_histogram: {
+            field: "date",
+            interval: "1w"
+          },
+          aggs: {
+            sales: {
+              sum: {
+                field: "price"
+              }
+            }
+          }
+        },
+        max_bucket_sales: {
+          max_bucket: {
+            buckets_path: "sales_per_week>sales"
+          }
+        }
+      }
+    })
+  }
+  async practiceAggregatesQueryWithAggregation() {
+    await this.search(CommonService.aggressRangeIndex, {
+      // size: 0,
+      query: {
+        match: {
+          price: 100
+        }
+      },
+      aggs: {
+        date_range_order: {
+          date_range: {
+            field: "date",
+            ranges: [
+              {to: "2020-07-23"},
+              {from: "2020-07-23"}
+            ]
+          }
+        }
+      }
+    })
   }
 }

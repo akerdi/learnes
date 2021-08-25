@@ -1,10 +1,73 @@
 import _ from 'lodash'
 
 import connection from './connection'
-import logger from '../log'
-import config from '@/config'
 
+interface IAggres {
+  // 单值分析
+  min?: {field: string} // 最小值
+  max?: {field: string} // 最大值
+  avg?: {field: string} // 平均值
+  sum?: {field: string} // 總合
+  value_count?: {field: string} // 指定欄位的個數
+  cardinality?: {field: string} // 基數值，就是不重複的數值的個數，類似 SQL 的 distinct count
+  // 多值分析
+  stats?: {field: string}
+  extended_stats?: {field: string}
+  percentiles?: { field: string}
+  percentile_ranks?: {field:string, values: number[]}
+  top_hits?: { size: number }
+  // 桶聚合
+  terms?: {field:string, size?:number} // 按照单词分桶
+  range?: { // 按照指定区域分桶
+    field: string
+    // SURPRICE 下面支持多种ts类型聚合
+    ranges?: ({to: number}|{from:number, to:number}|{from: number})[]
+  }
+  date_range?: { // 按照日期分桶
+    field: string,
+    ranges: ({to:string}|{from:string})[]
+  }
+  histogram?: { // 按照指定数值作为区间分桶
+    field: string
+    interval: number
+    min_doc_count: number
+  }
+  date_histogram?: { // 按照指定时间间隔分桶
+    field: string
+    interval: string // 1周 = 1w [es官网](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-datehistogram-aggregation.html#calendar_intervals)
+  }
+  // #parent
+  derivative?: { buckets_path: string } // 當分出了第一桶之後，第一桶的結果會被拿去和第二桶的結果計算他們的差值，以此類推
+  moving_avg?: { buckets_path: string } //用于平滑化数据(CPU负载、RAM使用量等)
+  cumulative_sum?: { buckets_path: string } // 用于不断累加每一桶结果
+  bucket_sort?: { sort: {[key:string]: { order: string }}[], size?: number } // 排序分桶的结果
+  bucket_script?: { // 对多桶或单通的结果进行计算
+    buckets_path: {
+      [key:string]: string // k为指定参数，v为parent桶参数 .e.g. "TotalSales: 'sales'"
+    }
+    script: string // 执行操作 .e.g. "params.TotalSales * 2"
+  }
+  bucket_selector?: { // 按照依照指定的条件取出特定的桶子
+    buckets_path: {
+      [key:string]: string // 同bucket_script
+    }
+    script: string // .e.g. "params.TotalSales > 1000"
+  }
+  // #Sibling
+  avg_bucket?: { buckets_path: string } // 計算同級聚合中指定的指標 (Metric) 的平均值
+  max_bucket?: { buckets_path: string } // 取得有最大值的桶子
+  aggs?: IAggresAny
+}
+
+// SURPRICE 支持IAggresAny 和 IAggres 互相嵌套
+interface IAggresAny {
+  [key:string]: IAggres
+}
 export interface ISearch {
+  aggs?: { // 聚合
+    [key:string]: IAggresAny | IAggres
+  }
+  scroll?: string // 滚动
   query?: {
     match?: any
     bool?: {
@@ -31,9 +94,6 @@ export interface ISearch {
       }
     }
     fuzzy?: { // 检索用于此项的近似检索，例如applx 可以检索出包含apple 的文档
-      [key:string]: any
-    }
-    aggs?: { // 聚合
       [key:string]: any
     }
   }
@@ -115,14 +175,10 @@ export default class ESClient {
   static async scrollQueryNext(sq:{scrollId:string, scroll:string}) {
     return this.getClient().scroll(sq)
   }
-  static async clearScroll(scrollId:string) {
-
-  }
   static refresh(params:any) {
     return this.getClient().indices.refresh(params)
   }
   static deleteIndex(params:any) {
     return this.getClient().indices.delete(params)
   }
-
 }

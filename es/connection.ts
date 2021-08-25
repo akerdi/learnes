@@ -67,9 +67,6 @@ class Connection {
     if (!defaultClient) logError("请在调用connect之后再调用")
     return defaultClient
   }
-  static indexPrefix() {
-    return "bcp_"
-  }
 }
 
 export default Connection
